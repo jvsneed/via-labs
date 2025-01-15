@@ -1,0 +1,165 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <canvas id="type-scene"></canvas>
+</div>
+
+<script>
+    import * as THREE from 'three';
+    import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+    import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({
+        canvas: document.querySelector('#type-scene') as HTMLCanvasElement,
+        antialias: true
+    });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000);
+    camera.position.z = 30;
+
+    // Add lights
+    const light1 = new THREE.PointLight(0xff0066, 1, 100);
+    const light2 = new THREE.PointLight(0x00ffff, 1, 100);
+    light1.position.set(10, 10, 10);
+    light2.position.set(-10, -10, -10);
+    scene.add(light1, light2);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // Text fragments
+    let fragments: THREE.Mesh[] = [];
+    const loader = new FontLoader();
+    
+    loader.load('/fonts/helvetiker_bold.typeface.json', (font) => {
+        const words = ['BREAK', 'UNITE'];
+        let offset = -15;
+        
+        words.forEach((word) => {
+            const geometry = new TextGeometry(word, {
+                font,
+                size: 5,
+                height: 1,
+                curveSegments: 4,
+                bevelEnabled: true,
+                bevelThickness: 0.2,
+                bevelSize: 0.05,
+                bevelSegments: 3
+            });
+
+            geometry.center();
+            
+            // Break into fragments
+            const vertices = geometry.attributes.position.array;
+            for (let i = 0; i < vertices.length; i += 9) {
+                const geometryFragment = new THREE.BufferGeometry();
+                const positions = new Float32Array(9);
+                for (let j = 0; j < 9; j++) {
+                    positions[j] = vertices[i + j];
+                }
+                geometryFragment.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometryFragment.computeVertexNormals();
+
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    metalness: 0.8,
+                    roughness: 0.2,
+                    emissive: new THREE.Color(Math.random(), Math.random(), Math.random()).multiplyScalar(0.2)
+                });
+
+                const mesh = new THREE.Mesh(geometryFragment, material);
+                mesh.position.y = offset;
+                mesh.userData.originalPosition = mesh.position.clone();
+                mesh.userData.randomPosition = new THREE.Vector3(
+                    (Math.random() - 0.5) * 50,
+                    (Math.random() - 0.5) * 50,
+                    (Math.random() - 0.5) * 50
+                );
+                fragments.push(mesh);
+                scene.add(mesh);
+            }
+            offset += 10;
+        });
+    });
+
+    // Mouse interaction
+    const mouse = new THREE.Vector2();
+    const target = new THREE.Vector2();
+    
+    document.addEventListener('mousemove', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    // Animation
+    function animate() {
+        requestAnimationFrame(animate);
+
+        target.lerp(mouse, 0.1);
+
+        fragments.forEach((fragment) => {
+            const distanceFromCenter = Math.abs(target.x);
+            const lerpFactor = Math.max(0, 1 - distanceFromCenter);
+
+            fragment.position.lerp(
+                distanceFromCenter > 0.5 ? 
+                    fragment.userData.randomPosition : 
+                    fragment.userData.originalPosition,
+                0.03
+            );
+
+            fragment.rotation.x += 0.01 * (1 - lerpFactor);
+            fragment.rotation.y += 0.01 * (1 - lerpFactor);
+        });
+
+        light1.position.x = mouse.x * 10;
+        light1.position.y = mouse.y * 10;
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+    }
+
+    canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+</style>

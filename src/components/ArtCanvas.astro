@@ -1,0 +1,207 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <h1 class="main-text">CREATIVE</h1>
+    <h1 class="main-text-shadow">CHAOS</h1>
+    <div class="floating-elements">
+        <div class="circle"></div>
+        <div class="square"></div>
+    </div>
+    <div class="mouse-follower"></div>
+    <div id="particles"></div>
+</div>
+
+<script>
+    let mouseX = 0;
+    let mouseY = 0;
+    
+    // Create particles
+    const particles: { element: HTMLDivElement; x: number; y: number; speedX: number; speedY: number; }[] = [];
+    const particlesContainer = document.getElementById('particles');
+    
+    for(let i = 0; i < 20; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particlesContainer?.appendChild(particle);
+        particles.push({
+            element: particle,
+            x: Math.random() * window.innerWidth,
+            y: Math.random() * window.innerHeight,
+            speedX: Math.random() * 4 - 2,
+            speedY: Math.random() * 4 - 2
+        });
+    }
+
+    // Mouse movement handler
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        
+        const follower = document.querySelector('.mouse-follower') as HTMLElement;
+        if (follower) {
+            follower.style.left = `${mouseX}px`;
+            follower.style.top = `${mouseY}px`;
+        }
+
+        // Make text react to mouse
+        const mainText = document.querySelector('.main-text') as HTMLElement;
+        if (mainText) {
+            const dx = (mouseX - window.innerWidth / 2) * 0.02;
+            const dy = (mouseY - window.innerHeight / 2) * 0.02;
+            mainText.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+    });
+
+    // Click handler for color changes
+    document.addEventListener('click', () => {
+        const randomColor = () => `hsl(${Math.random() * 360}, 100%, 50%)`;
+        document.querySelectorAll('.floating-elements > div').forEach(el => {
+            (el as HTMLElement).style.backgroundColor = randomColor();
+        });
+    });
+
+    // Animation loop
+    function animate() {
+        const elements = document.querySelectorAll('.floating-elements > div');
+        elements.forEach((el, i) => {
+            (el as HTMLElement).style.animation = `float ${3 + i}s infinite alternate ease-in-out`;
+        });
+
+        particles.forEach(particle => {
+            particle.x += particle.speedX;
+            particle.y += particle.speedY;
+
+            // Bounce off walls
+            if (particle.x < 0 || particle.x > window.innerWidth) particle.speedX *= -1;
+            if (particle.y < 0 || particle.y > window.innerHeight) particle.speedY *= -1;
+
+            particle.element.style.transform = `translate(${particle.x}px, ${particle.y}px)`;
+        });
+
+        requestAnimationFrame(animate);
+    }
+    animate();
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .main-text, .main-text-shadow {
+        font-size: 15vw;
+        font-weight: 900;
+        position: absolute;
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: -0.05em;
+        transition: transform 0.3s ease;
+    }
+
+    .main-text {
+        color: #fff;
+        mix-blend-mode: difference;
+        animation: pulse 2s infinite;
+    }
+
+    .main-text-shadow {
+        color: #ff00ff;
+        filter: blur(10px);
+        animation: float 4s infinite alternate ease-in-out;
+    }
+
+    .floating-elements {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+    }
+
+    .circle, .square {
+        position: absolute;
+        opacity: 0.5;
+        transition: background-color 0.5s ease, transform 0.3s ease;
+        cursor: pointer;
+    }
+
+    .circle {
+        width: 200px;
+        height: 200px;
+        border-radius: 50%;
+        background: #00ff00;
+        left: 20%;
+        top: 30%;
+    }
+
+    .square {
+        width: 150px;
+        height: 150px;
+        background: #ff0000;
+        right: 25%;
+        top: 40%;
+    }
+
+    .circle:hover, .square:hover {
+        transform: scale(1.2) rotate(45deg);
+    }
+
+    .mouse-follower {
+        position: fixed;
+        width: 20px;
+        height: 20px;
+        background: white;
+        border-radius: 50%;
+        mix-blend-mode: difference;
+        pointer-events: none;
+        transform: translate(-50%, -50%); /* Center the follower */
+        transition: left 0.1s ease, top 0.1s ease;
+        z-index: 9999;
+    }
+
+    .particle {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    @keyframes float {
+        0% { transform: translateY(0) rotate(0deg) scale(1); }
+        50% { transform: translateY(30px) rotate(10deg) scale(1.1); }
+        100% { transform: translateY(0) rotate(0deg) scale(1); }
+    }
+</style>

@@ -9,6 +9,12 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^5.1.6"
+    "@floating-ui/dom": "^1.6.13",
+    "@types/matter-js": "^0.19.8",
+    "@types/three": "^0.172.0",
+    "astro": "^5.1.6",
+    "gsap": "^3.12.5",
+    "matter-js": "^0.20.0",
+    "three": "^0.172.0"
   }
 }

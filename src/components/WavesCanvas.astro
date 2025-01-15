@@ -1,0 +1,177 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Waves">
+    <div class="canvas">
+        <nav class="nav-links">
+            <a href="/">RETURN TO LAB</a>
+        </nav>
+        <canvas id="waves"></canvas>
+        <div class="instructions">DRAG TO DISTURB</div>
+    </div>
+
+    <script>
+        const canvas = document.querySelector('#waves') as HTMLCanvasElement;
+        const ctx = canvas.getContext('2d')!;
+
+        // Wave simulation properties
+        const columns = 100;
+        const rows = 100;
+        const spacing = 10;
+        let dampening = 0.99;
+        let tension = 0.025;
+
+        // Setup wave grids
+        let current = new Array(columns * rows).fill(0);
+        let previous = new Array(columns * rows).fill(0);
+
+        // Initialize canvas
+        function setupCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)';
+            ctx.lineWidth = 2;
+        }
+        setupCanvas();
+        window.addEventListener('resize', setupCanvas);
+
+        // Mouse interaction
+        let isPressed = false;
+        let mouseX = 0;
+        let mouseY = 0;
+        let lastX = 0;
+        let lastY = 0;
+
+        canvas.addEventListener('mousedown', (e) => {
+            isPressed = true;
+            lastX = mouseX = e.clientX;
+            lastY = mouseY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            if (isPressed) {
+                disturb(mouseX, mouseY, 50);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => isPressed = false);
+
+        // Disturb water at point
+        function disturb(x: number, y: number, strength: number) {
+            const column = Math.floor(x / spacing);
+            const row = Math.floor(y / spacing);
+            if (column > 0 && column < columns && row > 0 && row < rows) {
+                current[row * columns + column] = strength;
+            }
+        }
+
+        // Update wave simulation
+        function update() {
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < columns; j++) {
+                    const idx = i * columns + j;
+                    if (i > 0 && i < rows - 1 && j > 0 && j < columns - 1) {
+                        const above = previous[(i - 1) * columns + j];
+                        const below = previous[(i + 1) * columns + j];
+                        const left = previous[i * columns + j - 1];
+                        const right = previous[i * columns + j + 1];
+
+                        const velocity = (above + below + left + right) / 2 - current[idx];
+                        current[idx] = current[idx] + velocity * tension;
+                    }
+                    current[idx] *= dampening;
+                }
+            }
+
+            // Swap buffers
+            [current, previous] = [previous, current];
+        }
+
+        // Render waves
+        function render() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw wave mesh
+            for (let i = 1; i < rows - 1; i++) {
+                ctx.beginPath();
+                for (let j = 1; j < columns - 1; j++) {
+                    const idx = i * columns + j;
+                    const x = j * spacing;
+                    const y = i * spacing + current[idx] * 3;
+                    
+                    if (j === 1) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            update();
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Auto disturbance
+        setInterval(() => {
+            if (!isPressed) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                disturb(x, y, Math.random() * 30);
+            }
+        }, 2000);
+    </script>
+
+    <style>
+        .canvas {
+            width: 100%;
+            height: 100vh;
+            background: #000;
+            overflow: hidden;
+            position: relative;
+        }
+
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            filter: blur(1px) contrast(2);
+        }
+
+        .nav-links {
+            position: fixed;
+            top: 2rem;
+            left: 2rem;
+            z-index: 100;
+        }
+
+        .nav-links a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.8rem;
+            letter-spacing: 0.2em;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+
+        .instructions {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 0.8rem;
+            letter-spacing: 0.2em;
+            opacity: 0.5;
+        }
+    </style>
+</Layout>

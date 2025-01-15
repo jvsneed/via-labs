@@ -1,0 +1,127 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <div class="instructions">CLICK TO CREATE</div>
+</div>
+
+<script>
+    import * as Matter from 'matter-js';
+
+    // Setup Matter.js
+    const engine = Matter.Engine.create();
+    const render = Matter.Render.create({
+        element: document.querySelector('.canvas') as HTMLElement,
+        engine: engine,
+        options: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+            wireframes: false,
+            background: '#f0f0f0',  // Light gray background
+            pixelRatio: window.devicePixelRatio
+        }
+    });
+
+    // Create ground with darker color
+    const ground = Matter.Bodies.rectangle(
+        window.innerWidth / 2,
+        window.innerHeight + 30,
+        window.innerWidth,
+        60,
+        { 
+            isStatic: true, 
+            render: { 
+                fillStyle: '#dedede'  // Slightly darker than background
+            } 
+        }
+    );
+
+    // Add walls
+    const wallLeft = Matter.Bodies.rectangle(-30, window.innerHeight/2, 60, window.innerHeight, { isStatic: true });
+    const wallRight = Matter.Bodies.rectangle(window.innerWidth + 30, window.innerHeight/2, 60, window.innerHeight, { isStatic: true });
+
+    Matter.World.add(engine.world, [ground, wallLeft, wallRight]);
+
+    // Click handler to create objects
+    document.addEventListener('click', (event) => {
+        const shapes = [
+            () => Matter.Bodies.circle(event.clientX, event.clientY, 20 + Math.random() * 20, {
+                render: {
+                    fillStyle: `hsla(${Math.random() * 360}, 70%, 50%, 0.8)`  // More saturated colors
+                }
+            }),
+            () => Matter.Bodies.rectangle(event.clientX, event.clientY, 40 + Math.random() * 40, 40 + Math.random() * 40, {
+                chamfer: { radius: 5 },
+                render: {
+                    fillStyle: `hsl(${Math.random() * 360}, 80%, 60%)`
+                }
+            }),
+            () => Matter.Bodies.polygon(event.clientX, event.clientY, Math.floor(3 + Math.random() * 5), 30, {
+                render: {
+                    fillStyle: `hsl(${Math.random() * 360}, 80%, 60%)`
+                }
+            })
+        ];
+
+        const shape = shapes[Math.floor(Math.random() * shapes.length)]();
+        Matter.World.add(engine.world, shape);
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        render.canvas.width = window.innerWidth;
+        render.canvas.height = window.innerHeight;
+        Matter.Body.setPosition(ground, Matter.Vector.create(window.innerWidth/2, window.innerHeight + 30));
+    });
+
+    // Start the engine and renderer
+    Matter.Runner.run(engine);
+    Matter.Render.run(render);
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #f0f0f0;  // Match render background
+        overflow: hidden;
+        position: relative;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #333;  /* Changed from white to dark gray */
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.9;  /* Increased opacity */
+        transition: opacity 0.3s;
+        font-weight: 500;  /* Added font weight */
+        text-shadow: none;  /* Remove any shadow */
+    }
+
+    .nav-links a:hover {
+        opacity: 1;
+        color: #000;  /* Darker on hover */
+    }
+
+    .instructions {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #333;  // Darker text for light background
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.5;
+    }
+</style>

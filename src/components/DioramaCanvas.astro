@@ -1,0 +1,208 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    
+    <div class="frame">
+        <div class="scene">
+            <div class="layer stars" data-speed="0.1"></div>
+            <div class="layer mountains-back" data-speed="0.2"></div>
+            <div class="layer mountains-mid" data-speed="0.3"></div>
+            <div class="layer trees" data-speed="0.4"></div>
+            <div class="layer grass" data-speed="0.5"></div>
+            <div class="layer clouds" data-speed="-0.2"></div>
+            <div class="layer mist" data-speed="0.2"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const scene = document.querySelector('.scene');
+    const layers = document.querySelectorAll('.layer');
+    
+    let mouseX = 0;
+    let mouseY = 0;
+    let targetX = 0;
+    let targetY = 0;
+
+    // Enhanced movement values
+    let time = 0;
+    function autoMove() {
+        time += 0.002;  // Slower automatic movement
+        return {
+            x: Math.sin(time) * 25,  // Increased range
+            y: Math.cos(time) * 15   // Increased range
+        };
+    }
+
+    // Enhanced mouse movement handler with more dramatic effect
+    document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX - window.innerWidth / 2) * 0.4;   // 4x sensitivity
+        mouseY = (e.clientY - window.innerHeight / 2) * 0.4;  // 4x sensitivity
+    });
+
+    function animate() {
+        const auto = autoMove();
+        targetX += (mouseX - targetX) * 0.1;  // Faster response
+        targetY += (mouseY - targetY) * 0.1;
+
+        layers.forEach(layer => {
+            const speed = Number((layer as HTMLElement).dataset.speed);
+            const x = (targetX + auto.x) * speed * 4;  // 4x effect
+            const y = (targetY + auto.y) * speed * 4;
+            const scale = 1 + Math.abs(speed) * 0.2;   // More scale
+            const rotate = (speed * targetX * 0.1);    // More rotation
+            const z = speed * 2000;                    // More depth
+            
+            (layer as HTMLElement).style.transform = 
+                `translate3d(${x}px, ${y}px, ${z}px) 
+                 scale(${scale}) 
+                 rotate(${rotate}deg)`;
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    animate();
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: linear-gradient(180deg, #0B1026 0%, #2F2958 100%);
+        overflow: hidden;
+        position: relative;
+    }
+
+    /* Navigation styles */
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .frame {
+        position: relative;
+        width: 80vh;
+        height: 60vh;
+        margin: auto;
+        border-radius: 4px;
+        background: #2a2a2a;
+        padding: 0;  /* Remove padding that was causing the cutoff */
+        box-shadow: 
+            0 0 0 1px rgba(255,255,255,0.1),
+            0 20px 40px rgba(0,0,0,0.4);
+        transform: perspective(1000px) rotateX(2deg);
+        overflow: hidden;
+    }
+
+    .frame::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+            45deg,
+            transparent 0%,
+            rgba(255,255,255,0.05) 50%,
+            transparent 100%
+        );
+        pointer-events: none;
+    }
+
+    .scene {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        perspective: 2000px;
+        transform-style: preserve-3d;
+        overflow: visible;  /* Allow layers to overflow */
+        border-radius: 2px;
+    }
+
+    .layer {
+        position: absolute;
+        width: 160%;    /* Increased coverage */
+        height: 160%;   /* Increased coverage */
+        left: -30%;     /* Adjusted positioning */
+        top: -30%;      /* Adjusted positioning */
+        background-size: cover;
+        background-position: center;
+        transform-style: preserve-3d;
+        will-change: transform;
+        transition: transform 0.1s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    @media (max-width: 768px) {
+        .frame {
+            width: 90vw;
+            height: 70vw;
+            transform: perspective(1000px) rotateX(1deg);
+        }
+    }
+
+    /* Updated layer styles with more dramatic effects */
+    .mountains-back {
+        background-image: url('/diorama/mountains-back.png');
+        filter: brightness(0.7) contrast(1.2);
+    }
+
+    .mountains-mid {
+        background-image: url('/diorama/mountains-mid.png');
+        filter: brightness(0.8) contrast(1.1);
+    }
+
+    .trees {
+        background-image: url('/diorama/trees.png');
+        filter: brightness(0.9) contrast(1.1);
+    }
+
+    .grass {
+        background-image: url('/diorama/grass.png');
+        filter: contrast(1.1);
+    }
+
+    .clouds {
+        background-image: url('/diorama/clouds.png');
+        opacity: 0.9;
+        mix-blend-mode: screen;
+        filter: contrast(1.2);
+    }
+
+    .mist {
+        background: linear-gradient(
+            to bottom,
+            transparent,
+            rgba(255,255,255,0.1) 50%,
+            transparent
+        );
+        mix-blend-mode: soft-light;
+    }
+
+    .stars {
+        background-image: 
+            radial-gradient(1px 1px at 20px 30px, white, transparent),
+            radial-gradient(1px 1px at 40px 70px, white, transparent),
+            radial-gradient(1px 1px at 50px 160px, white, transparent),
+            radial-gradient(1px 1px at 90px 40px, white, transparent);
+        background-size: 200px 200px;
+        opacity: 0.4;
+        transform-style: preserve-3d;
+    }
+</style>

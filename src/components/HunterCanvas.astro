@@ -1,0 +1,242 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <div class="score">PARTICLES: <span id="score">0</span></div>
+    <div class="player">
+        <div class="crosshair"></div>
+        <div class="crosshair"></div>
+    </div>
+    <div class="particles-container"></div>
+</div>
+
+<script>
+    console.log('Script starting...');
+    let score = 0;
+    const scoreElement = document.getElementById('score');
+    const player = document.querySelector('.player') as HTMLElement | null;
+    const container = document.querySelector('.particles-container') as HTMLElement | null;
+
+    if (!player || !container) {
+        console.error('Required elements not found');
+        throw new Error('Required elements not found');
+    }
+
+    console.log('Elements found:', { 
+        score: scoreElement, 
+        player, 
+        container 
+    });
+
+    const particles: HTMLElement[] = [];
+
+    // Player movement with null check
+    document.addEventListener('mousemove', (e) => {
+        if (!player) return;
+        const x = e.clientX;
+        const y = e.clientY;
+        player.style.transform = `translate(${x}px, ${y}px)`;
+        checkCollisions(x, y);
+    });
+
+    // Create particles
+    function createParticle() {
+        console.log('Creating new particle...');
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        
+        // More interesting colors and positions
+        const hue = Math.random() * 360;
+        const left = Math.random() * window.innerWidth;
+        const top = Math.random() * window.innerHeight;
+        
+        particle.style.cssText = `
+            position: absolute;
+            left: ${left}px;
+            top: ${top}px;
+            width: 30px;
+            height: 30px;
+            background: hsl(${hue}, 100%, 60%);
+            border-radius: 50%;
+            z-index: 1000;
+            box-shadow: 0 0 20px hsl(${hue}, 100%, 50%);
+            transition: transform 0.3s ease;
+        `;
+        
+        console.log('Adding particle to container');
+        container?.appendChild(particle);
+        particles.push(particle);
+        console.log('Current particle count:', particles.length);
+
+        // Faster movement
+        let dx = (Math.random() - 0.5) * 5;
+        let dy = (Math.random() - 0.5) * 5;
+
+        function moveParticle() {
+            if (!particle.isConnected) return;
+            
+            let x = parseFloat(particle.style.left);
+            let y = parseFloat(particle.style.top);
+
+            if (x < 0 || x > window.innerWidth - 20) dx *= -1;
+            if (y < 0 || y > window.innerHeight - 20) dy *= -1;
+
+            x += dx;
+            y += dy;
+
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+
+            requestAnimationFrame(moveParticle);
+        }
+
+        moveParticle();
+    }
+
+    // Check collisions
+    function checkCollisions(playerX: number, playerY: number) {
+        particles.forEach((particle, index) => {
+            const rect = particle.getBoundingClientRect();
+            const dx = playerX - (rect.left + rect.width/2);
+            const dy = playerY - (rect.top + rect.height/2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < 30) { // Collision radius
+                particle.remove();
+                particles.splice(index, 1);
+                score++;
+                if (scoreElement) scoreElement.textContent = score.toString();
+                createParticle(); // Create new particle
+            }
+        });
+    }
+
+    // Increase initial particle count
+    console.log('Creating initial particles...');
+    for (let i = 0; i < 15; i++) {  // Increased count
+        createParticle();
+    }
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: linear-gradient(135deg, #0f0f1a, #1a0f1a, #1a1a2f);
+        position: relative;
+        cursor: none;
+        overflow: hidden;
+    }
+
+    .canvas::before {
+        content: '';
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background-image: 
+            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        pointer-events: none;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .score {
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        color: #fff;
+        font-size: 2rem;  // Bigger text
+        font-weight: bold;
+        letter-spacing: 0.1em;
+        text-shadow: 
+            0 0 10px rgba(255,255,255,0.5),
+            0 0 20px rgba(255,255,255,0.3);  // Enhanced glow
+    }
+
+    .player {
+        position: fixed;
+        width: 40px;  /* Smaller size */
+        height: 40px;
+        pointer-events: none;
+        z-index: 100;
+        transform: translate(-50%, -50%); /* Center the crosshair */
+    }
+
+    /* Remove the before/after pseudo-elements */
+    .player::before,
+    .player::after {
+        display: none;
+    }
+
+    /* Simplified crosshair lines */
+    .player .crosshair {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.9);  /* Solid white lines */
+    }
+
+    /* Horizontal line */
+    .player .crosshair:first-child {
+        top: 50%;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        transform: translateY(-50%);
+    }
+
+    /* Vertical line */
+    .player .crosshair:last-child {
+        left: 50%;
+        top: 0;
+        width: 1px;
+        height: 100%;
+        transform: translateX(-50%);
+    }
+
+    /* Remove unused animations */
+    @keyframes rotate {
+        from { transform: translate(-50%, -50%) rotate(0deg); }
+        to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .particles-container {
+        position: fixed !important;  /* Force fixed positioning */
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        background: transparent; /* Removed debug background */
+    }
+
+    .particle {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        filter: blur(2px);
+        z-index: 1000;
+    }
+
+    .particle:hover {
+        transform: scale(2);
+    }
+</style>

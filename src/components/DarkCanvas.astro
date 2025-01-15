@@ -1,0 +1,161 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-link">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    
+    <div class="content">
+        <h1 class="main-text">ETERNAL</h1>
+        <h1 class="main-text-echo">SILENCE</h1>
+        
+        <div class="symbol"></div>
+    </div>
+
+    <div class="floating-particles"></div>
+</div>
+
+<script>
+    // Create more visible ash-like particles
+    const container = document.querySelector('.floating-particles');
+    for (let i = 0; i < 150; i++) { // More particles
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = `${Math.random() * 100}vw`;
+        particle.style.animationDelay = `${Math.random() * 3}s`;
+        particle.style.animationDuration = `${3 + Math.random() * 4}s`; // Faster falling
+        container?.appendChild(particle);
+    }
+
+    // Enhanced parallax effect
+    document.addEventListener('mousemove', (e) => {
+        const { clientX, clientY } = e;
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        
+        // Enhanced symbol movement
+        const symbol = document.querySelector('.symbol') as HTMLElement;
+        if (symbol) {
+            const moveX = (clientX - centerX) * 0.1;
+            const moveY = (clientY - centerY) * 0.1;
+            symbol.style.transform = `translate(${moveX}px, ${moveY}px) rotate(${Date.now() * 0.01}deg)`;
+        }
+
+        // Add text parallax
+        const mainText = document.querySelector('.main-text') as HTMLElement;
+        const echoText = document.querySelector('.main-text-echo') as HTMLElement;
+        if (mainText && echoText) {
+            mainText.style.transform = `translate(${(clientX - centerX) * 0.03}px, ${(clientY - centerY) * 0.03}px)`;
+            echoText.style.transform = `translate(${(clientX - centerX) * 0.05}px, ${(clientY - centerY) * 0.05}px)`;
+        }
+    });
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #1a1a1a;
+        overflow: hidden;
+        position: relative;
+        color: #e0e0e0;
+    }
+
+    .nav-link {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-link a {
+        color: #e0e0e0;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .nav-link a:hover {
+        opacity: 1;
+    }
+
+    .content {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+    }
+
+    .main-text, .main-text-echo {
+        font-size: 12vw;
+        font-weight: 300;
+        letter-spacing: 0.2em;
+        margin: 0;
+        line-height: 1;
+        font-family: 'Times New Roman', serif;
+        transition: transform 0.1s ease;
+    }
+
+    .main-text-echo {
+        position: absolute;
+        opacity: 0.2;
+        transform: translateY(15px);
+        filter: blur(2px);
+        top:50%;
+    }
+
+    .symbol {
+        width: 400px; /* Larger symbol */
+        height: 400px;
+        position: absolute;
+        border: 2px solid rgba(224, 224, 224, 0.3);
+        transform-origin: center;
+        transition: transform 0.1s ease;
+        filter: drop-shadow(0 0 20px rgba(224, 224, 224, 0.1));
+    }
+
+    .symbol::before, .symbol::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        height: 100%;
+        border: 2px solid rgba(224, 224, 224, 0.2);
+        transform: translate(-50%, -50%) rotate(45deg);
+    }
+
+    .particle {
+        position: fixed;
+        width: 3px;
+        height: 3px;
+        background: rgba(224, 224, 224, 0.4);
+        pointer-events: none;
+        filter: blur(1px);
+        animation: fall linear infinite;
+    }
+
+    @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes fall {
+        from { 
+            transform: translateY(-10vh) rotate(0deg); 
+            opacity: 0; 
+        }
+        50% { 
+            opacity: 0.8;
+        }
+        to { 
+            transform: translateY(100vh) rotate(360deg);
+            opacity: 0; 
+        }
+    }
+</style>

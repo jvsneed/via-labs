@@ -1,11 +1,201 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="VIA LABS">
+    <div class="labs">
+        <div class="title-section">
+            <h1>VIA<br/>LABS</h1>
+            <p class="subtitle">Exploratory scenescapes</p>
+        </div>
+        <nav class="lab-links">
+            <a href="/chaos" class="link" data-preview="/chaos">
+                <span class="number">01</span>
+                <span class="name">CREATIVE CHAOS</span>
+            </a>
+            <a href="/dark" class="link" data-preview="/dark">
+                <span class="number">02</span>
+                <span class="name">ETERNAL SILENCE</span>
+            </a>
+            <a href="/space" class="link" data-preview="/space">
+                <span class="number">03</span>
+                <span class="name">CUB(E)(V)OID</span>
+            </a>
+            <a href="/neon" class="link" data-preview="/neon">
+                <span class="number">04</span>
+                <span class="name">THE ORBS</span>
+            </a>
+            <a href="/hunter" class="link" data-preview="/hunter">
+                <span class="number">05</span>
+                <span class="name">PARTICLE HUNTER</span>
+            </a>
+            <a href="/physics" class="link" data-preview="/physics">
+                <span class="number">06</span>
+                <span class="name">PHYSICS LAB</span>
+            </a>
+            <a href="/diorama" class="link" data-preview="/diorama">
+                <span class="number">07</span>
+                <span class="name">PARALLAX WORLD</span>
+            </a>
+            <a href="/type" class="link" data-preview="/type">
+                <span class="number">08</span>
+                <span class="name">TYPE SPACE</span>
+            </a>
+            <a href="/liquid" class="link" data-preview="/liquid">
+                <span class="number">09</span>
+                <span class="name">LIQUID LAB</span>
+            </a>
+            <a href="/waves" class="link" data-preview="/waves">
+                <span class="number">10</span>
+                <span class="name">FLUID WAVES</span>
+            </a>
+        </nav>
+        <div id="preview-popup">
+            <iframe></iframe>
+        </div>
+    </div>
 </Layout>
+
+<script>
+    import { computePosition, flip, shift, offset } from '@floating-ui/dom';
+
+    const popup = document.querySelector('#preview-popup') as HTMLElement;
+    const iframe = popup.querySelector('iframe') as HTMLIFrameElement;
+    let currentLink: HTMLElement | null = null;
+
+    document.querySelectorAll('.link').forEach(link => {
+        const showPreview = (e: Event) => {
+            currentLink = e.currentTarget as HTMLElement;
+            const previewUrl = currentLink.getAttribute('data-preview');
+            
+            if (previewUrl) {
+                iframe.src = previewUrl;
+                popup.style.display = 'block';
+                
+                if (currentLink) {
+                    computePosition(currentLink, popup, {
+                        placement: 'right',
+                        middleware: [
+                            offset(10),
+                            flip(),
+                            shift()
+                        ],
+                    }).then(({x, y}) => {
+                        popup.style.left = `${x}px`;
+                        popup.style.top = `${y}px`;
+                    });
+                }
+            }
+        };
+
+        link.addEventListener('mouseenter', showPreview);
+        link.addEventListener('mouseleave', () => {
+            popup.style.display = 'none';
+            iframe.src = 'about:blank';
+        });
+    });
+</script>
+
+<style>
+    .labs {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 2rem;
+        background: #181818;
+        gap: 2rem;
+    }
+
+    .title-section {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-left: 4rem;
+    }
+
+    h1 {
+        font-size: clamp(5rem, 15vw, 12rem);
+        font-weight: 900;
+        color: #fff;
+        margin: 0;
+        letter-spacing: -0.02em;
+        line-height: 0.9;
+    }
+
+    .subtitle {
+        color: #666;
+        font-size: 1.2rem;
+        margin: 1rem 0 0;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .lab-links {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 2rem;
+    }
+
+    .link {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        text-decoration: none;
+        color: #fff;
+        opacity: 0.7;
+        transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .link:hover {
+        opacity: 1;
+        transform: translateX(20px);
+    }
+
+    .number {
+        font-size: 1rem;
+        opacity: 0.5;
+    }
+
+    .name {
+        font-size: 2rem;
+        letter-spacing: 0.1em;
+    }
+
+    #preview-popup {
+        display: none;
+        position: fixed;
+        width: 400px;
+        height: 300px;
+        background: #000;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        z-index: 1000;
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    }
+
+    #preview-popup iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        transform: scale(0.7);
+        transform-origin: 0 0;
+        pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+        .labs {
+            grid-template-columns: 1fr;
+            padding: 1rem;
+        }
+
+        .title-section {
+            padding-left: 1rem;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 10vw, 6rem);
+        }
+    }
+</style>
