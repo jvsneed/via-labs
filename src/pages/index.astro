@@ -9,13 +9,12 @@ const labItems = [
     { href: '/space', name: 'CUB(E)(V)OID' },
     { href: '/neon', name: 'THE ORBS' },
     { href: '/liquid', name: 'LIGHT FLOAT' },
+    { href: '/neural', name: 'NO REAL NETWORK' },
     { href: '/hunter', name: 'PARTICLE HUNTER' },
     { href: '/physics', name: 'TAP2SHAPE' },
     { href: '/diorama', name: 'TOUCHING GRASS' },
     { href: '/type', name: 'UNITE BREAK' },
     { href: '/chaos', name: 'CREATIVE CHAOS' }
-
-
 ];
 ---
 
@@ -30,7 +29,7 @@ const labItems = [
         </div>
         <nav class="lab-links">
             {labItems.map((item, index) => (
-                <a href={item.href} class="link" data-preview={item.href}>
+                <a href={item.href} class="link reveal-item" data-preview={item.href}>
                     <span class="number">{(index + 1).toString().padStart(2, '0')}</span>
                     <span class="name">{item.name}</span>
                 </a>
@@ -80,6 +79,27 @@ const labItems = [
             iframe.src = 'about:blank';
         });
     });
+
+    // Add scroll effects with proper typing
+    const observerOptions = {
+        root: document.querySelector('.lab-links'),
+        threshold: 0.1
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.reveal-item').forEach((item, index) => {
+        // Add type casting to HTMLElement
+        const element = item as HTMLElement;
+        element.style.setProperty('--delay', `${index * 0.1}s`);
+        observer.observe(item);
+    });
 </script>
 
 <style>
@@ -97,6 +117,8 @@ const labItems = [
         flex-direction: column;
         justify-content: center;
         padding-left: 4rem;
+        position: sticky;
+        top: 0;
     }
 
     h1 {
@@ -120,11 +142,24 @@ const labItems = [
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        justify-content: flex-start;
         gap: 2rem;
         height: 60vh;
-        padding: 20rem 0 5rem 0;
-        overflow:scroll;
+        padding: 4rem 0;
+        overflow: auto;
+        scroll-behavior: smooth;
+        mask-image: linear-gradient(
+            to bottom,
+            black,
+            black 90%,
+            transparent
+        );
+        -webkit-mask-image: linear-gradient(
+            to bottom,
+            black,
+            black 90%,
+            transparent
+        );
     }
 
     .link {
@@ -134,12 +169,15 @@ const labItems = [
         text-decoration: none;
         color: #fff;
         opacity: 0.7;
-        transition: opacity 0.3s, transform 0.3s;
+        padding-left: 0;
+    }
+
+    .link.visible {
+        opacity: 0.7;
     }
 
     .link:hover {
         opacity: 1;
-        transform: translateX(20px);
     }
 
     .number {
@@ -206,6 +244,16 @@ const labItems = [
 
         .mobile-warning {
             display: block;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .link {
+            transition: opacity 0.5s ease-out;
+        }
+        
+        .lab-links {
+            scroll-behavior: auto;
         }
     }
 </style>

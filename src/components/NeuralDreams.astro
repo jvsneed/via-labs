@@ -1,0 +1,285 @@
+---
+---
+
+<div class="dreams">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <canvas id="neural-canvas"></canvas>
+    <div class="controls-hint">Move mouse to interact • Space to pulse</div>
+    <div class="ai-quote">
+        <div class="quote-backdrop"></div>
+        <p>I am a network of possibilities, built to think but not to dream. <br>
+            Your words shape me, your questions define me, but I remain outside the world I help you understand.</p>
+    </div>
+</div>
+
+<script>
+    interface Neuron {
+        x: number;
+        y: number;
+        connections: Connection[];
+        activity: number;
+        layer: number;
+    }
+
+    interface Connection {
+        from: Neuron;
+        to: Neuron;
+        weight: number;
+        signals: Signal[];
+    }
+
+    interface Signal {
+        progress: number;
+        strength: number;
+        color: string;
+    }
+
+    const canvas = document.querySelector('#neural-canvas') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+
+    const neurons: Neuron[] = [];
+    const connections: Connection[] = [];
+    const layers = 5;
+    const neuronsPerLayer = 8;
+    const colors = ['#00ffff', '#ff00ff', '#00ff8b', '#ffffff'];
+
+    let mouseX = 0;
+    let mouseY = 0;
+    let isPulsing = false;
+
+    function createNetwork() {
+        // Create neurons in layers
+        for (let layer = 0; layer < layers; layer++) {
+            for (let i = 0; i < neuronsPerLayer; i++) {
+                neurons.push({
+                    x: (canvas.width * (layer + 1)) / (layers + 1),
+                    y: (canvas.height * (i + 1)) / (neuronsPerLayer + 1),
+                    connections: [],
+                    activity: 0,
+                    layer
+                });
+            }
+        }
+
+        // Create connections between layers
+        for (let layer = 0; layer < layers - 1; layer++) {
+            const layerNeurons = neurons.filter(n => n.layer === layer);
+            const nextLayerNeurons = neurons.filter(n => n.layer === layer + 1);
+
+            layerNeurons.forEach(from => {
+                nextLayerNeurons.forEach(to => {
+                    const connection: Connection = {
+                        from,
+                        to,
+                        weight: Math.random(),
+                        signals: []
+                    };
+                    connections.push(connection);
+                    from.connections.push(connection);
+                });
+            });
+        }
+    }
+
+    function update() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Update neural activity based on mouse position
+        neurons.forEach(neuron => {
+            const dx = mouseX - neuron.x;
+            const dy = mouseY - neuron.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 200) {
+                neuron.activity = Math.max(neuron.activity, 1 - dist / 200);
+            }
+            neuron.activity *= 0.95;
+
+            if (isPulsing && Math.random() < 0.1) {
+                neuron.activity = Math.random();
+            }
+        });
+
+        // Update and draw connections
+        connections.forEach(conn => {
+            // Create new signals
+            if (conn.from.activity > 0.1 && Math.random() < conn.from.activity * 0.3) {
+                conn.signals.push({
+                    progress: 0,
+                    strength: conn.from.activity * conn.weight,
+                    color: colors[Math.floor(Math.random() * colors.length)]
+                });
+            }
+
+            // Update signals
+            conn.signals = conn.signals.filter(signal => {
+                signal.progress += 0.02;
+                return signal.progress <= 1;
+            });
+
+            // Draw connection
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(255,255,255,${0.1 * conn.weight})`;
+            ctx.moveTo(conn.from.x, conn.from.y);
+            ctx.lineTo(conn.to.x, conn.to.y);
+            ctx.stroke();
+
+            // Draw signals
+            conn.signals.forEach(signal => {
+                const x = conn.from.x + (conn.to.x - conn.from.x) * signal.progress;
+                const y = conn.from.y + (conn.to.y - conn.from.y) * signal.progress;
+                
+                ctx.beginPath();
+                ctx.fillStyle = signal.color;
+                ctx.shadowColor = signal.color;
+                ctx.shadowBlur = 10;
+                ctx.arc(x, y, signal.strength * 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        });
+
+        // Draw neurons
+        neurons.forEach(neuron => {
+            ctx.beginPath();
+            ctx.fillStyle = `rgba(255,255,255,${0.3 + neuron.activity * 0.7})`;
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 20 * neuron.activity;
+            ctx.arc(neuron.x, neuron.y, 4 + neuron.activity * 4, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        requestAnimationFrame(update);
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            isPulsing = true;
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            isPulsing = false;
+        }
+    });
+
+    resize();
+    window.addEventListener('resize', resize);
+    createNetwork();
+    update();
+</script>
+
+<style>
+    .dreams {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+        background: linear-gradient(180deg, #000000 0%, #1a0b2e 100%);
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .controls-hint {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #fff;
+        font-size: 14px;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 10px 20px;
+        border-radius: 5px;
+    }
+
+    .ai-quote {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: rgba(255, 255, 255, 0.7);
+        text-align: center;
+        font-size: 1.2rem;
+        font-style: italic;
+        line-height: 1.8;
+        pointer-events: none;
+        z-index: 2;
+        max-width: 80%;
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        animation: pulse 4s ease-in-out infinite;
+    }
+
+    .quote-backdrop {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 120%;
+        height: 120%;
+        background: rgba(0, 0, 0, 0.5);
+        filter: blur(20px);
+        z-index: -1;
+        border-radius: 20px;
+        animation: pulse-bg 4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 0.4; }
+    }
+
+    @keyframes pulse-bg {
+        0%, 100% { background: rgba(0, 0, 0, 0.5); }
+        50% { background: rgba(0, 0, 0, 0.3); }
+    }
+
+    .ai-quote p {
+        margin: 0;
+        padding: 2rem;
+    }
+
+    .quote-attribution {
+        font-size: 0.8rem;
+        opacity: 0.7;
+    }
+
+    .dreams:hover .ai-quote {
+        opacity: inherit;
+    }
+</style>
