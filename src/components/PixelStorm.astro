@@ -1,0 +1,214 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <canvas id="pixel-storm"></canvas>
+    <div class="controls-hint">SPACE to spawn, 1-3 for effects</div>
+</div>
+
+<script>
+    const canvas = document.querySelector('#pixel-storm') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+
+    interface Particle {
+        x: number;
+        y: number;
+        vx: number;
+        vy: number;
+        life: number;
+        maxLife: number;
+        color: string;
+        size: number;
+    }
+
+    const particles: Particle[] = [];
+    const connections: number[][] = [];
+    let mode = 'constellation';
+
+    function createParticle(x: number, y: number): Particle {
+        const colors = [
+            '#00ff8b',
+            '#00f0ff',
+            '#ff00e6',
+            '#ff0062',
+            '#ffffff'
+        ];
+        return {
+            x,
+            y,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            life: 1,
+            maxLife: Math.random() * 200 + 100,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            size: Math.random() * 3 + 1
+        };
+    }
+
+    function spawnParticles(x: number, y: number) {
+        for (let i = 0; i < 20; i++) {
+            particles.push(createParticle(x, y));
+        }
+    }
+
+    function updateAndDraw() {
+        // Change background fade opacity to preserve more of the gradient
+        ctx.fillStyle = 'rgba(16, 14, 45, 0.2)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Update particles
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life++;
+
+            // Boundary check with bounce
+            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+            // Remove dead particles
+            if (p.life > p.maxLife) {
+                particles.splice(i, 1);
+                continue;
+            }
+
+            // Draw particle
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+
+            // Draw connections
+            if (mode === 'constellation') {
+                particles.forEach((p2, j) => {
+                    if (i === j) return;
+                    const dx = p.x - p2.x;
+                    const dy = p.y - p2.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 100) {
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.strokeStyle = `rgba(255,255,255,${(100-dist)/100 * 0.2})`;
+                        ctx.stroke();
+                    }
+                });
+            } else if (mode === 'streams') {
+                p.vy += 0.05;
+                p.vx *= 0.99;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p.x - p.vx * 5, p.y - p.vy * 5);
+                ctx.strokeStyle = p.color;
+                ctx.stroke();
+            } else if (mode === 'vortex') {
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const angle = Math.atan2(p.y - centerY, p.x - centerX);
+                const dist = Math.sqrt((p.x - centerX)**2 + (p.y - centerY)**2);
+                p.vx += Math.cos(angle + Math.PI/2) * 0.1;
+                p.vy += Math.sin(angle + Math.PI/2) * 0.1;
+                p.vx *= 0.99;
+                p.vy *= 0.99;
+            }
+        }
+
+        // Auto spawn
+        if (Math.random() < 0.1) {
+            spawnParticles(
+                Math.random() * canvas.width,
+                Math.random() * canvas.height
+            );
+        }
+
+        requestAnimationFrame(updateAndDraw);
+    }
+
+    // Setup
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Add initial gradient on resize
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, '#1a1040');
+        gradient.addColorStop(1, '#102040');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Controls
+    canvas.addEventListener('mousemove', (e) => {
+        if (e.buttons === 1) {
+            spawnParticles(e.clientX, e.clientY);
+        }
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        spawnParticles(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    document.addEventListener('keydown', (e) => {
+        switch(e.key) {
+            case '1': mode = 'constellation'; break;
+            case '2': mode = 'streams'; break;
+            case '3': mode = 'vortex'; break;
+            case ' ': 
+                spawnParticles(canvas.width/2, canvas.height/2);
+                break;
+        }
+    });
+
+    updateAndDraw();
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: linear-gradient(135deg, #1a1040 0%, #102040 100%);
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .controls-hint {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+        z-index: 100;
+    }
+</style>

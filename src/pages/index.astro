@@ -1,5 +1,22 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
+const labItems = [
+    { href: '/waves', name: 'FLUID WAVES' },
+    { href: '/dark', name: 'ETERNAL SILENCE' },
+    { href: '/pixels', name: 'PIXEL STORM' },
+    { href: '/garden', name: 'GLOW GARDEN' },
+    { href: '/space', name: 'CUB(E)(V)OID' },
+    { href: '/neon', name: 'THE ORBS' },
+    { href: '/liquid', name: 'LIGHT FLOAT' },
+    { href: '/hunter', name: 'PARTICLE HUNTER' },
+    { href: '/physics', name: 'TAP2SHAPE' },
+    { href: '/diorama', name: 'TOUCHING GRASS' },
+    { href: '/type', name: 'UNITE BREAK' },
+    { href: '/chaos', name: 'CREATIVE CHAOS' }
+
+
+];
 ---
 
 <Layout title="VIA LABS">
@@ -12,48 +29,12 @@ import Layout from '../layouts/Layout.astro';
             <p class="subtitle">Exploratory scenescapes</p>
         </div>
         <nav class="lab-links">
-            <a href="/waves" class="link" data-preview="/waves">
-                <span class="number">01</span>
-                <span class="name">FLUID WAVES</span>
-            </a>
-
-            <a href="/dark" class="link" data-preview="/dark">
-                <span class="number">02</span>
-                <span class="name">ETERNAL SILENCE</span>
-            </a>
-            <a href="/space" class="link" data-preview="/space">
-                <span class="number">03</span>
-                <span class="name">CUB(E)(V)OID</span>
-            </a>
-            <a href="/neon" class="link" data-preview="/neon">
-                <span class="number">04</span>
-                <span class="name">THE ORBS</span>
-            </a>
-            <a href="/hunter" class="link" data-preview="/hunter">
-                <span class="number">05</span>
-                <span class="name">PARTICLE HUNTER</span>
-            </a>
-            <a href="/physics" class="link" data-preview="/physics">
-                <span class="number">06</span>
-                <span class="name">PHYSICS LAB</span>
-            </a>
-            <!-- <a href="/diorama" class="link" data-preview="/diorama">
-                <span class="number">07</span>
-                <span class="name">PARALLAX WORLD</span>
-            </a> -->
-            <a href="/type" class="link" data-preview="/type">
-                <span class="number">07</span>
-                <span class="name">UNITE BREAK</span>
-            </a>
-            <a href="/liquid" class="link" data-preview="/liquid">
-                <span class="number">08</span>
-                <span class="name">LIGHT FLOAT</span>
-            </a>
-            <a href="/chaos" class="link" data-preview="/chaos">
-                <span class="number">09</span>
-                <span class="name">CREATIVE CHAOS</span>
-            </a>
-
+            {labItems.map((item, index) => (
+                <a href={item.href} class="link" data-preview={item.href}>
+                    <span class="number">{(index + 1).toString().padStart(2, '0')}</span>
+                    <span class="name">{item.name}</span>
+                </a>
+            ))}
         </nav>
         <div id="preview-popup">
             <iframe></iframe>
@@ -141,7 +122,7 @@ import Layout from '../layouts/Layout.astro';
         flex-direction: column;
         justify-content: center;
         gap: 2rem;
-        max-height: 50vh;
+        height: 60vh;
         padding: 20rem 0 5rem 0;
         overflow:scroll;
     }

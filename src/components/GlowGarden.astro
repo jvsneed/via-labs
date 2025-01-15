@@ -1,0 +1,452 @@
+---
+---
+
+<div class="garden">
+    <div id="warning-modal" class="warning-modal">
+        <div class="warning-content">
+            <h2>⚠️ Motion Warning</h2>
+            <p>This experience contains motion effects that may trigger photosensitive conditions.</p>
+            <div class="warning-buttons">
+                <button id="proceed-btn">I understand, proceed</button>
+                <a href="/" class="return-btn">Return to lab</a>
+            </div>
+        </div>
+    </div>
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <canvas id="garden-canvas"></canvas>
+    <div class="controls-hint">Click to plant • Space to spread seeds</div>
+</div>
+
+<script>
+    interface Plant {
+        x: number;
+        y: number;
+        height: number;
+        maxHeight: number;
+        branches: Branch[];
+        color: string;
+        growthRate: number;
+        lastBranchHeight: number;
+        age: number;
+        type: 'normal' | 'spiral' | 'weeping';
+        flowers: Flower[];
+        swayOffset: number;
+        swaySpeed: number;
+    }
+
+    interface Branch {
+        startHeight: number;
+        length: number;
+        angle: number;
+        grown: number;
+    }
+
+    interface Particle {
+        x: number;
+        y: number;
+        vx: number;
+        vy: number;
+        life: number;
+        color: string;
+        size: number;
+    }
+
+    interface Flower {
+        x: number;
+        y: number;
+        size: number;
+        angle: number;
+        petalCount: number;
+        bloomState: number;
+    }
+
+    const canvas = document.querySelector('#garden-canvas') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d')!;
+
+    const plants: Plant[] = [];
+    const particles: Particle[] = [];
+    const colors = [
+        '#00ff8b',
+        '#00ffd1',
+        '#00ffff',
+        '#00d1ff',
+        '#ff00ff'
+    ];
+
+    let windForce = 0;
+    let windAngle = 0;
+    let ambientLight = 0;
+
+    function createPlant(x: number, y: number): Plant {
+        const types = ['normal', 'spiral', 'weeping'] as const;
+        return {
+            x,
+            y,
+            height: 0,
+            maxHeight: Math.random() * 200 + 100,
+            branches: [],
+            color: colors[Math.floor(Math.random() * colors.length)],
+            growthRate: Math.random() * 0.5 + 0.5,
+            lastBranchHeight: 0,
+            age: 0,
+            type: types[Math.floor(Math.random() * types.length)],
+            flowers: [],
+            swayOffset: Math.random() * Math.PI * 2,
+            swaySpeed: Math.random() * 0.02 + 0.01
+        };
+    }
+
+    function createParticle(x: number, y: number, color: string): Particle {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 2 + 1;
+        return {
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 1,
+            life: Math.random() * 100 + 50,
+            color,
+            size: Math.random() * 3 + 1
+        };
+    }
+
+    function createFlower(x: number, y: number, color: string): Flower {
+        return {
+            x,
+            y,
+            size: Math.random() * 10 + 5,
+            angle: Math.random() * Math.PI * 2,
+            petalCount: Math.floor(Math.random() * 5) + 5,
+            bloomState: 0
+        };
+    }
+
+    // Add animation start control
+    const warningModal = document.getElementById('warning-modal');
+    const proceedBtn = document.getElementById('proceed-btn');
+    let animationStarted = false;
+
+    function startAnimation() {
+        animationStarted = true;
+        warningModal?.classList.add('hidden');
+        update();
+    }
+
+    proceedBtn?.addEventListener('click', startAnimation);
+
+    function update() {
+        if (!animationStarted) return;
+
+        // Update wind
+        windForce += (Math.random() - 0.5) * 0.01;
+        windForce *= 0.99;
+        windAngle += 0.01;
+
+        // Update ambient light based on particle count
+        ambientLight = Math.min(0.2, particles.length * 0.001);
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.05 - ambientLight})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Update plants
+        plants.forEach(plant => {
+            if (plant.height < plant.maxHeight) {
+                plant.height += plant.growthRate;
+                plant.age++;
+
+                // Add new branches occasionally
+                if (plant.height - plant.lastBranchHeight > 30 && Math.random() < 0.3) {
+                    plant.branches.push({
+                        startHeight: plant.height,
+                        length: Math.random() * 30 + 20,
+                        angle: (Math.random() - 0.5) * Math.PI * 0.75,
+                        grown: 0
+                    });
+                    plant.lastBranchHeight = plant.height;
+                }
+
+                // Emit particles
+                if (Math.random() < 0.1) {
+                    particles.push(createParticle(
+                        plant.x,
+                        plant.y - plant.height,
+                        plant.color
+                    ));
+                }
+
+                // Add flowers at tips
+                if (plant.height > plant.maxHeight * 0.8 && Math.random() < 0.05) {
+                    plant.flowers.push(createFlower(
+                        plant.x,
+                        plant.y - plant.height,
+                        plant.color
+                    ));
+                }
+            }
+
+            // Apply wind effect
+            const windEffect = Math.sin(windAngle + plant.swayOffset) * windForce;
+            
+            // Draw based on plant type
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = plant.color;
+            ctx.strokeStyle = plant.color;
+            ctx.lineWidth = 2;
+
+            if (plant.type === 'spiral') {
+                // Draw spiral pattern
+                for (let i = 0; i < plant.height; i += 5) {
+                    const angle = (i / 20) + windEffect;
+                    const radius = i * 0.1;
+                    const x = plant.x + Math.cos(angle) * radius;
+                    const y = plant.y - i + Math.sin(angle) * radius;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else if (plant.type === 'weeping') {
+                // Draw weeping pattern
+                const segments = 10;
+                for (let i = 0; i < segments; i++) {
+                    const t = i / segments;
+                    const x = plant.x + Math.sin(t * Math.PI + windEffect) * (plant.height * 0.3);
+                    const y = plant.y - plant.height * t;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(plant.x, plant.y - plant.height * (i/segments));
+                    ctx.quadraticCurveTo(
+                        x + windEffect * 50,
+                        y,
+                        plant.x + Math.sin(t * Math.PI * 2) * 20,
+                        plant.y - plant.height * ((i+1)/segments)
+                    );
+                    ctx.stroke();
+                }
+            } else {
+                // Normal plant with wind effect
+                ctx.beginPath();
+                ctx.moveTo(plant.x, plant.y);
+                ctx.quadraticCurveTo(
+                    plant.x + windEffect * 50,
+                    plant.y - plant.height * 0.5,
+                    plant.x + windEffect * 30,
+                    plant.y - plant.height
+                );
+                ctx.stroke();
+            }
+
+            // Draw branches
+            plant.branches.forEach(branch => {
+                if (branch.grown < branch.length) {
+                    branch.grown += plant.growthRate;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(plant.x, plant.y - branch.startHeight);
+                ctx.lineTo(
+                    plant.x + Math.cos(branch.angle) * branch.grown,
+                    plant.y - branch.startHeight + Math.sin(branch.angle) * branch.grown
+                );
+                ctx.stroke();
+            });
+
+            // Draw flowers
+            plant.flowers.forEach(flower => {
+                if (flower.bloomState < 1) flower.bloomState += 0.05;
+                
+                for (let i = 0; i < flower.petalCount; i++) {
+                    const petalAngle = (i / flower.petalCount) * Math.PI * 2 + flower.angle + windEffect;
+                    const petalSize = flower.size * flower.bloomState;
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        flower.x + windEffect * 20,
+                        flower.y,
+                        petalSize,
+                        petalSize * 0.5,
+                        petalAngle,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            });
+        });
+
+        // Update particles
+        ctx.shadowBlur = 5;
+        particles.forEach((particle, i) => {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.vy += 0.05;
+            particle.life--;
+
+            if (particle.life <= 0) {
+                particles.splice(i, 1);
+                return;
+            }
+
+            ctx.shadowColor = particle.color;
+            ctx.fillStyle = particle.color;
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        requestAnimationFrame(update);
+    }
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    canvas.addEventListener('click', (e) => {
+        plants.push(createPlant(e.clientX, canvas.height));
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') {
+            for (let i = 0; i < 5; i++) {
+                plants.push(createPlant(
+                    Math.random() * canvas.width,
+                    canvas.height
+                ));
+            }
+        }
+    });
+
+    // Add mouse move effect for ambient lighting
+    canvas.addEventListener('mousemove', (e) => {
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        // Add particles around mouse for ambient light effect
+        if (Math.random() < 0.2) {
+            particles.push(createParticle(x, y, colors[Math.floor(Math.random() * colors.length)]));
+        }
+    });
+
+    resize();
+    window.addEventListener('resize', resize);
+    // Don't auto-start animation
+</script>
+
+<style>
+    .garden {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+    }
+
+    canvas {
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+        background: linear-gradient(180deg, #000000 0%, #1a0b2e 100%);
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .controls-hint {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.8rem;
+        letter-spacing: 0.1em;
+        z-index: 100;
+    }
+
+    .warning-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(26, 16, 64, 0);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(10px);
+    }
+
+    .warning-modal.hidden {
+        display: none;
+    }
+
+    .warning-content {
+        background: rgba(26, 16, 64, 0.582);
+        padding: 2rem;
+        border-radius: 12px;
+        max-width: 400px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .warning-content h2 {
+        color: #fff;
+        margin: 0 0 1rem 0;
+        font-size: 1.5rem;
+    }
+
+    .warning-content p {
+        color: rgba(255, 255, 255, 0.8);
+        margin: 0 0 1.5rem 0;
+        line-height: 1.5;
+    }
+
+    .warning-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+
+    .warning-content button,
+    .return-btn {
+        background: #b500a3;
+        color: white;
+        border: none;
+        padding: 0.8rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        text-decoration: none;
+        transition: transform 0.2s, background 0.2s;
+    }
+
+    .return-btn {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .warning-content button:hover,
+    .return-btn:hover {
+        background: #ff40ea;
+        transform: translateY(-1px);
+    }
+
+    .return-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+</style>
