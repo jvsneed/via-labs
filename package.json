@@ -9,6 +9,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "^12.2.0",
     "@floating-ui/dom": "^1.6.13",
     "@types/matter-js": "^0.19.8",
     "@types/three": "^0.172.0",
