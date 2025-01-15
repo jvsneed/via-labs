@@ -1,0 +1,602 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <div class="game-ui">
+        <div class="score">SCORE: <span id="score">0</span></div>
+        <div class="game-over hidden">
+            GAME OVER<br>
+            PRESS SPACE TO RESTART
+        </div>
+        <div class="high-score">HIGH SCORE: <span id="high-score">0</span></div>
+        <div class="speed">SPEED: <span id="speed">20</span></div>
+        <div class="power-ups">
+            <div class="power-up-item slow hidden">
+                <span class="icon">⌛</span>
+                <div class="timer"></div>
+            </div>
+            <div class="power-up-item shield hidden">
+                <span class="icon">🛡️</span>
+                <div class="timer"></div>
+            </div>
+        </div>
+    </div>
+    <canvas id="runner-scene"></canvas>
+</div>
+
+<script>
+    import * as THREE from 'three';
+
+    class Game {
+        scene: THREE.Scene;
+        camera: THREE.PerspectiveCamera;
+        renderer: THREE.WebGLRenderer;
+        player!: THREE.Mesh<THREE.BoxGeometry, THREE.MeshPhongMaterial>;  // Fix material type
+        grid!: THREE.GridHelper;  // Use definite assignment assertion
+        playerTrail!: THREE.Points;  // Add type for playerTrail
+        obstacles: THREE.Mesh[];
+        score: number;
+        speed: number;
+        isGameOver: boolean;
+        powerUps: Array<THREE.Mesh<THREE.OctahedronGeometry, THREE.MeshPhongMaterial>> = [];
+        particles: Array<{
+            points: THREE.Points;
+            velocities: THREE.Vector3[];
+            life: number;
+            material: THREE.PointsMaterial;  // Add explicit material type
+        }> = [];
+        canJump = true;
+        jumpHeight = 0;
+        highScore = 0;
+        powerUpTypes = [
+            {
+                color: 0xffff00,
+                effect: 'slow' as const,
+                duration: 3000,
+                multiplier: 0.6,
+                recoveryRate: 0.001  // Add recovery rate
+            },
+            {
+                color: 0xff00ff,
+                effect: 'shield',
+                duration: 5000,
+                multiplier: 1
+            },
+            {
+                color: 0x00ffff,
+                effect: 'points',
+                duration: 0,
+                multiplier: 2
+            }
+        ];
+        activeEffects: Set<string> = new Set();
+        isShielded = false;
+        baseSpeed = 0.2;  // Add base speed reference
+        speedRecoveryRate = 0.0005;  // Speed recovery per frame
+        
+        constructor() {
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: document.querySelector('#runner-scene') as HTMLCanvasElement,
+                antialias: true
+            });
+            this.obstacles = [];
+            this.score = 0;
+            this.speed = 0.2;
+            this.isGameOver = false;
+            
+            // Ensure game instance is available globally
+            (window as any).gameInstance = this;
+            this.loadHighScore();
+            this.init();
+        }
+
+        loadHighScore() {
+            const saved = localStorage.getItem('gridRunnerHighScore');
+            this.highScore = saved ? parseInt(saved) : 0;
+            document.querySelector('#high-score')!.textContent = this.highScore.toString();
+        }
+
+        private init() {
+            this.setup();
+            this.createPlayer();
+            this.createGrid();
+            this.addLights();
+            this.bindControls();
+            this.animate();
+        }
+
+        setup() {
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setClearColor(0x000000);
+            this.camera.position.set(0, 5, 10);
+            this.camera.lookAt(0, 0, 0);
+        }
+
+        createPlayer() {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x00ff88,
+                emissive: 0x00ff88,
+                emissiveIntensity: 0.5
+            });
+            this.player = new THREE.Mesh(geometry, material);
+            this.player.position.y = 1;
+            this.scene.add(this.player);
+
+            // Add player trail
+            const trailGeometry = new THREE.BufferGeometry();
+            const trailMaterial = new THREE.PointsMaterial({
+                size: 0.1,
+                color: 0x00ff88,
+                transparent: true,
+                opacity: 0.5
+            });
+            this.playerTrail = new THREE.Points(trailGeometry, trailMaterial);
+            this.scene.add(this.playerTrail);
+        }
+
+        createGrid() {
+            this.grid = new THREE.GridHelper(100, 50, 0x0088ff, 0x0088ff);
+            this.scene.add(this.grid);
+        }
+
+        addLights() {
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            const pointLight = new THREE.PointLight(0xff0088, 1, 100);
+            pointLight.position.set(10, 10, 10);
+            this.scene.add(ambientLight, pointLight);
+        }
+
+        spawnObstacle() {
+            const geometry = new THREE.BoxGeometry(1, Math.random() * 3 + 1, 1);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0xff0088,
+                emissive: 0xff0088,
+                emissiveIntensity: 0.5
+            });
+            const obstacle = new THREE.Mesh(geometry, material);
+            obstacle.position.z = -50;
+            obstacle.position.x = (Math.random() - 0.5) * 8;
+            obstacle.position.y = geometry.parameters.height / 2;
+            this.obstacles.push(obstacle);
+            this.scene.add(obstacle);
+        }
+
+        spawnPowerUp() {
+            if (Math.random() < 0.01) {
+                const powerUpType = this.powerUpTypes[Math.floor(Math.random() * this.powerUpTypes.length)];
+                const geometry = new THREE.OctahedronGeometry(0.5);
+                const material = new THREE.MeshPhongMaterial({
+                    color: powerUpType.color,
+                    emissive: powerUpType.color,
+                    emissiveIntensity: 0.5
+                });
+                const powerUp = new THREE.Mesh(geometry, material) as THREE.Mesh<THREE.OctahedronGeometry, THREE.MeshPhongMaterial>;
+                powerUp.position.set(
+                    (Math.random() - 0.5) * 8,
+                    1,
+                    -50
+                );
+                powerUp.userData.type = powerUpType;
+                this.powerUps.push(powerUp);
+                this.scene.add(powerUp);
+            }
+        }
+
+        applyPowerUpEffect(powerUp: THREE.Mesh<THREE.OctahedronGeometry, THREE.MeshPhongMaterial>) {
+            const type = powerUp.userData.type;
+            const powerUpElement = document.querySelector(`.power-up-item.${type.effect}`);
+            
+            switch(type.effect) {
+                case 'slow':
+                    this.speed *= type.multiplier;
+                    this.activeEffects.add('slow');
+                    this.showPowerUpTimer(powerUpElement, type.duration);
+                    setTimeout(() => {
+                        this.activeEffects.delete('slow');
+                        powerUpElement?.classList.add('hidden');
+                    }, type.duration);
+                    break;
+                    
+                case 'shield':
+                    this.isShielded = true;
+                    (this.player.material as THREE.MeshPhongMaterial).color.setHex(0x00ffff);
+                    this.activeEffects.add('shield');
+                    this.showPowerUpTimer(powerUpElement, type.duration);
+                    setTimeout(() => {
+                        this.isShielded = false;
+                        (this.player.material as THREE.MeshPhongMaterial).color.setHex(0x00ff88);
+                        this.activeEffects.delete('shield');
+                        powerUpElement?.classList.add('hidden');
+                    }, type.duration);
+                    break;
+                    
+                case 'points':
+                    this.score += 50;
+                    this.showPointsGain('+50');
+                    document.querySelector('#score')!.textContent = this.score.toString();
+                    break;
+            }
+
+            // Create explosion and set its color
+            const explosion = this.createExplosion(powerUp.position);
+            explosion.material.color.setHex(type.color);
+        }
+
+        showPowerUpTimer(element: Element | null, duration: number) {
+            if (!element) return;
+            
+            element.classList.remove('hidden');
+            const timer = element.querySelector('.timer');
+            if (timer) {
+                timer.animate([
+                    { width: '100%' },
+                    { width: '0%' }
+                ], {
+                    duration,
+                    easing: 'linear'
+                });
+            }
+        }
+
+        showPointsGain(text: string) {
+            const pointsGain = document.createElement('div');
+            pointsGain.className = 'points-gain';
+            pointsGain.textContent = text;
+            document.querySelector('.game-ui')?.appendChild(pointsGain);
+            
+            pointsGain.animate([
+                { opacity: 1, transform: 'translateY(0)' },
+                { opacity: 0, transform: 'translateY(-50px)' }
+            ], {
+                duration: 1000,
+                easing: 'ease-out'
+            }).onfinish = () => pointsGain.remove();
+        }
+
+        bindControls() {
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && this.isGameOver) {
+                    this.restart();
+                }
+                if (e.code === 'ArrowLeft') {
+                    this.player.position.x = Math.max(this.player.position.x - 2, -4);
+                }
+                if (e.code === 'ArrowRight') {
+                    this.player.position.x = Math.min(this.player.position.x + 2, 4);
+                }
+                if (e.code === 'Space' && this.canJump && !this.isGameOver) {
+                    this.jump();
+                }
+            });
+        }
+
+        jump() {
+            this.canJump = false;
+            this.jumpHeight = 0.3;
+            setTimeout(() => this.canJump = true, 1000);
+        }
+
+        checkCollisions() {
+            const playerBox = new THREE.Box3().setFromObject(this.player);
+            for (const obstacle of this.obstacles) {
+                const obstacleBox = new THREE.Box3().setFromObject(obstacle);
+                if (playerBox.intersectsBox(obstacleBox)) {
+                    if (!this.isShielded) {
+                        this.gameOver();
+                    } else {
+                        // Remove obstacle if shielded
+                        this.scene.remove(obstacle);
+                        const index = this.obstacles.indexOf(obstacle);
+                        if (index > -1) {
+                            this.obstacles.splice(index, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        createExplosion(position: THREE.Vector3): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> {
+            const particleCount = 50;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = [];
+            
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = position.x;
+                positions[i + 1] = position.y;
+                positions[i + 2] = position.z;
+                velocities.push(new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.2,
+                    Math.random() * 0.2,
+                    (Math.random() - 0.5) * 0.2
+                ));
+            }
+            
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({
+                size: 0.1,
+                color: 0xff0088,
+                transparent: true,
+                opacity: 1
+            });
+            
+            const points = new THREE.Points(geometry, material);
+            const particles = { 
+                points, 
+                velocities, 
+                life: 1,
+                material  // Store material reference
+            };
+            this.particles.push(particles);
+            return points;  // Return points for material access
+        }
+
+        updateParticles() {
+            this.particles.forEach((particle, index) => {
+                const positions = particle.points.geometry.attributes.position;
+                
+                for (let i = 0; i < positions.count; i++) {
+                    const velocity = particle.velocities[i];
+                    positions.setXYZ(
+                        i,
+                        positions.getX(i) + velocity.x,
+                        positions.getY(i) + velocity.y,
+                        positions.getZ(i) + velocity.z
+                    );
+                }
+                
+                particle.life -= 0.02;
+                particle.material.opacity = particle.life;  // Use stored material reference
+                positions.needsUpdate = true;
+
+                if (particle.life <= 0) {
+                    this.scene.remove(particle.points);
+                    this.particles.splice(index, 1);
+                }
+            });
+        }
+
+        gameOver() {
+            this.isGameOver = true;
+            document.querySelector('.game-over')?.classList.remove('hidden');
+            this.speed = 0;
+        }
+
+        restart() {
+            this.score = 0;
+            this.speed = 0.2;
+            this.isGameOver = false;
+            document.querySelector('.game-over')?.classList.add('hidden');
+            document.querySelector('#score')!.textContent = '0';
+            
+            this.obstacles.forEach(obstacle => this.scene.remove(obstacle));
+            this.obstacles = [];
+            this.player.position.x = 0;
+        }
+
+        animate = () => {
+            requestAnimationFrame(this.animate);
+
+            if (!this.isGameOver) {
+                // Gradually recover speed if not slowed
+                if (!this.activeEffects.has('slow')) {
+                    this.speed = Math.min(
+                        this.speed + this.speedRecoveryRate,
+                        this.baseSpeed + (this.score * 0.0001)  // Max speed increases with score
+                    );
+                }
+
+                // Move grid
+                this.grid.position.z += this.speed;
+                if (this.grid.position.z > 2) this.grid.position.z = 0;
+
+                // Move and clean up obstacles
+                this.obstacles.forEach((obstacle, index) => {
+                    obstacle.position.z += this.speed;
+                    if (obstacle.position.z > 10) {
+                        this.scene.remove(obstacle);
+                        this.obstacles.splice(index, 1);
+                        this.score += 10;
+                        document.querySelector('#score')!.textContent = this.score.toString();
+                        this.speed = Math.min(this.speed + 0.001, 0.5);
+                    }
+                });
+
+                // Spawn new obstacles
+                if (Math.random() < 0.02) this.spawnObstacle();
+
+                // Update jump
+                if (this.jumpHeight > 0) {
+                    this.player.position.y += this.jumpHeight;
+                    this.jumpHeight -= 0.01;
+                } else {
+                    this.player.position.y = Math.max(1, this.player.position.y - 0.1);
+                }
+
+                // Update power-ups
+                const playerBox = new THREE.Box3().setFromObject(this.player);
+                this.powerUps.forEach((powerUp, index) => {
+                    powerUp.position.z += this.speed;
+                    powerUp.rotation.y += 0.05;
+                    powerUp.rotation.x += 0.03;
+                    
+                    const powerUpBox = new THREE.Box3().setFromObject(powerUp);
+                    if (playerBox.intersectsBox(powerUpBox)) {
+                        this.scene.remove(powerUp);
+                        this.powerUps.splice(index, 1);
+                        this.applyPowerUpEffect(powerUp);
+                    }
+                });
+
+                this.updateParticles();
+                this.spawnPowerUp();
+
+                this.checkCollisions();
+
+                // Update speed display
+                const speedDisplay = document.querySelector('#speed') as HTMLElement;
+                if (speedDisplay) {
+                    speedDisplay.textContent = (this.speed * 100).toFixed(0);
+                }
+            }
+
+            // Update high score
+            if (this.score > this.highScore) {
+                this.highScore = this.score;
+                localStorage.setItem('gridRunnerHighScore', this.highScore.toString());
+                document.querySelector('#high-score')!.textContent = this.highScore.toString();
+            }
+
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+
+    // Create and store game instance
+    const gameInstance = new Game();
+
+    // Fix resize handler
+    window.addEventListener('resize', () => {
+        const game = (window as any).gameInstance;
+        if (game) {
+            game.camera.aspect = window.innerWidth / window.innerHeight;
+            game.camera.updateProjectionMatrix();
+            game.renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    });
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+    }
+
+    .game-ui {
+        position: fixed;
+        width: 100%;
+        text-align: center;
+        color: #00ff88;
+        font-family: monospace;
+        font-size: 2rem;
+        text-shadow: 0 0 10px currentColor;
+        z-index: 100;
+        pointer-events: none;
+        top: 0;
+    }
+
+    .score {
+        padding: 2rem;
+    }
+
+    .game-over {
+        font-size: 3rem;
+        line-height: 1.5;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+        opacity: 1;
+    }
+
+    .high-score {
+        position: fixed;
+        top: 2rem;
+        right: 2rem;
+        font-family: monospace;
+        color: #00ff88;
+        text-shadow: 0 0 10px #00ff88;
+    }
+
+    .speed {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        font-family: monospace;
+        color: #00ff88;
+        text-shadow: 0 0 10px #00ff88;
+    }
+
+    .power-ups {
+        position: fixed;
+        left: 50%;
+        bottom: 2rem;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 1rem;
+    }
+
+    .power-up-item {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid currentColor;
+        border-radius: 0.5rem;
+        padding: 0.5rem;
+        position: relative;
+        width: 3rem;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .power-up-item.slow {
+        color: #ffff00;
+    }
+
+    .power-up-item.shield {
+        color: #ff00ff;
+    }
+
+    .power-up-item .icon {
+        font-size: 1.5rem;
+    }
+
+    .power-up-item .timer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 2px;
+        width: 100%;
+        background: currentColor;
+    }
+
+    .points-gain {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        color: #00ffff;
+        font-size: 2rem;
+        pointer-events: none;
+    }
+
+    .hidden {
+        display: none;
+    }
+</style>

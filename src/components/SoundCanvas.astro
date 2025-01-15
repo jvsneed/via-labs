@@ -1,0 +1,318 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <div class="controls-panel">
+        <div class="controls">
+            <button id="start-audio" class="control-btn">START AUDIO</button>
+            <select id="input-select" class="control-select">
+                <option value="demo">Demo Track</option>
+                <option value="mic">Microphone</option>
+            </select>
+        </div>
+    </div>
+    <canvas id="sound-scene"></canvas>
+</div>
+
+<script>
+    import * as THREE from 'three';
+
+    class AudioVisualizer {
+        scene: THREE.Scene;
+        camera: THREE.PerspectiveCamera;
+        renderer: THREE.WebGLRenderer;
+        audioContext!: AudioContext;  // Use definite assignment assertion
+        analyser!: AnalyserNode;      // Use definite assignment assertion
+        dataArray!: Uint8Array;       // Use definite assignment assertion
+        waves: THREE.Mesh[] = [];
+        isAudioStarted = false;
+        currentAudioSource?: MediaStreamAudioSourceNode | AudioBufferSourceNode;
+        currentStream?: MediaStream;
+
+        constructor() {
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: document.querySelector('#sound-scene') as HTMLCanvasElement,
+                antialias: true
+            });
+            
+            this.setup();
+            this.createWaves();
+            this.addLights();
+            this.initializeAudio();
+            this.animate();
+        }
+
+        private initializeAudio() {
+            this.audioContext = new AudioContext();
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            this.setupInputControls();
+        }
+
+        private setupInputControls() {
+            const startBtn = document.querySelector('#start-audio') as HTMLButtonElement;
+            const inputSelect = document.querySelector('#input-select') as HTMLSelectElement;
+
+            startBtn.addEventListener('click', async () => {
+                try {
+                    if (!this.isAudioStarted) {
+                        await this.startAudio(inputSelect.value);
+                        startBtn.textContent = 'STOP AUDIO';
+                        startBtn.disabled = false;  // Keep button enabled for toggling
+                    } else {
+                        this.stopAudio();
+                        startBtn.textContent = 'START AUDIO';
+                    }
+                    this.isAudioStarted = !this.isAudioStarted;
+                } catch (error) {
+                    console.error('Audio setup failed:', error);
+                    startBtn.textContent = 'AUDIO FAILED';
+                    setTimeout(() => {
+                        startBtn.textContent = 'START AUDIO';
+                        startBtn.disabled = false;
+                    }, 2000);
+                }
+            });
+
+            // Handle input type changes
+            inputSelect.addEventListener('change', async () => {
+                if (this.isAudioStarted) {
+                    this.stopAudio();
+                    await this.startAudio(inputSelect.value);
+                }
+            });
+        }
+
+        private async startAudio(inputType: string) {
+            if (inputType === 'mic') {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                this.currentStream = stream;
+                const source = this.audioContext.createMediaStreamSource(stream);
+                this.currentAudioSource = source;
+                source.connect(this.analyser);
+            } else {
+                const response = await fetch('/audio/demo-track.wav');
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+                const source = this.audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.loop = true;
+                this.currentAudioSource = source;
+                source.connect(this.analyser);
+                source.connect(this.audioContext.destination);
+                source.start();
+            }
+        }
+
+        private stopAudio() {
+            // Stop and cleanup current audio source
+            if (this.currentAudioSource) {
+                if (this.currentAudioSource instanceof AudioBufferSourceNode) {
+                    this.currentAudioSource.stop();
+                }
+                this.currentAudioSource.disconnect();
+            }
+
+            // Stop microphone stream if it exists
+            if (this.currentStream) {
+                this.currentStream.getTracks().forEach(track => track.stop());
+                this.currentStream = undefined;
+            }
+
+            // Reset analyser
+            this.dataArray.fill(0);
+        }
+
+        // Clean up resources when visualizer is destroyed
+        destroy() {
+            this.stopAudio();
+            if (this.audioContext.state !== 'closed') {
+                this.audioContext.close();
+            }
+        }
+
+        setup() {
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setClearColor(0x000000);
+            this.camera.position.set(0, 30, 50);
+            this.camera.lookAt(0, 0, 0);
+        }
+
+        createWaves() {
+            const colors = [
+                new THREE.Color(0xff0088).multiplyScalar(1.2), // Subtle brightness increase
+                new THREE.Color(0x00ff88).multiplyScalar(1.2),
+                new THREE.Color(0x0088ff).multiplyScalar(1.2)
+            ];
+            
+            for (let i = 0; i < 3; i++) {
+                const geometry = new THREE.PlaneGeometry(100, 100, 128, 128);
+                const material = new THREE.MeshPhongMaterial({
+                    color: colors[i],
+                    side: THREE.DoubleSide,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.4,  // Slightly increased opacity
+                    emissive: colors[i],
+                    emissiveIntensity: 0.2  // Reduced glow
+                });
+
+                const wave = new THREE.Mesh(geometry, material);
+                wave.rotation.x = -Math.PI / 2;
+                wave.position.y = i * 5;
+                this.waves.push(wave);
+                this.scene.add(wave);
+            }
+        }
+
+        addLights() {
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            const pointLight1 = new THREE.PointLight(0xff0088, 1.5, 100);  // Adjusted intensity
+            const pointLight2 = new THREE.PointLight(0x0088ff, 1.5, 100);
+            
+            pointLight1.position.set(10, 20, 10);
+            pointLight2.position.set(-10, 20, -10);
+            
+            this.scene.add(ambientLight, pointLight1, pointLight2);
+        }
+
+        updateWaves() {
+            this.analyser.getByteFrequencyData(this.dataArray);
+            
+            this.waves.forEach((wave, waveIndex) => {
+                const positions = (wave.geometry as THREE.PlaneGeometry).attributes.position;
+                const material = wave.material as THREE.MeshPhongMaterial;
+                let maxAmplitude = 0;
+                
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const y = positions.getY(i);
+                    
+                    const frequencyIndex = Math.abs(Math.floor(x)) % this.dataArray.length;
+                    const amplitude = this.dataArray[frequencyIndex] / 255;
+                    maxAmplitude = Math.max(maxAmplitude, amplitude);
+                    
+                    const z = Math.sin(x * 0.05 + y * 0.05 + waveIndex + performance.now() * 0.001) 
+                          * amplitude * 12;  // Adjusted amplitude
+                    
+                    positions.setZ(i, z);
+                }
+
+                // More subtle opacity and emission changes
+                material.opacity = 0.4 + maxAmplitude * 0.3;
+                material.emissiveIntensity = 0.2 + maxAmplitude * 0.4;
+                positions.needsUpdate = true;
+            });
+        }
+
+        animate = () => {
+            requestAnimationFrame(this.animate);
+
+            if (this.isAudioStarted) {
+                this.updateWaves();
+            }
+
+            this.renderer.render(this.scene, this.camera);  // Fix: Add 'this.'
+        }
+    }
+
+    // Create visualizer instance and store for cleanup
+    const visualizer = new AudioVisualizer();
+    
+    // Clean up when page is unloaded
+    window.addEventListener('beforeunload', () => {
+        visualizer.destroy();
+    });
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+        visualizer.camera.aspect = window.innerWidth / window.innerHeight;
+        visualizer.camera.updateProjectionMatrix();
+        visualizer.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+    }
+
+    .controls-panel {
+        position: fixed;
+        top: 50%;
+        left: 2rem;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        z-index: 100;
+    }
+
+    .control-btn {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: #fff;
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .control-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .control-btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+    }
+
+    .control-select {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: #fff;
+        padding: 0.5rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+        opacity: 1;
+    }
+
+</style>

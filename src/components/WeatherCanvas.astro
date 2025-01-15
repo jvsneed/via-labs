@@ -1,0 +1,341 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <div class="controls-panel">
+        <div class="controls">
+            <button class="control-btn" data-weather="rain">RAIN</button>
+            <button class="control-btn" data-weather="storm">STORM</button>
+            <button class="control-btn" data-weather="snow">SNOW</button>
+            <div class="intensity-slider">
+                <span>INTENSITY</span>
+                <input type="range" min="0" max="100" value="50" id="intensity">
+            </div>
+        </div>
+    </div>
+    <canvas id="weather-scene"></canvas>
+</div>
+
+<script>
+    import * as THREE from 'three';
+
+    class WeatherSystem {
+        scene: THREE.Scene;
+        camera: THREE.PerspectiveCamera;
+        renderer: THREE.WebGLRenderer;
+        particles: { [key: string]: THREE.Points } = {};  // Fix indexing type
+        lightning!: THREE.PointLight;  // Add definite assignment assertion
+        currentWeather: string = 'rain';  // Add explicit type and default
+        intensity: number = 0.5;
+        lights!: { pointLight1: THREE.PointLight, pointLight2: THREE.PointLight };  // Add missing type
+        thunderTimer: number = 0;
+
+        constructor() {
+            this.scene = new THREE.Scene();
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            const canvas = document.querySelector('#weather-scene');
+            if (!canvas) {
+                throw new Error('Could not find canvas element');
+            }
+            
+            this.renderer = new THREE.WebGLRenderer({
+                canvas: canvas as HTMLCanvasElement,
+                antialias: true
+            });
+            
+            this.setup();
+            this.createLights();
+            this.createParticleSystems();
+            this.bindControls();
+            this.createLightning();
+            this.animate();
+        }
+
+        setup() {
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setClearColor(0x111111);
+            this.camera.position.z = 50;
+            
+            // Add ground plane for particles to fall on
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(100, 100),
+                new THREE.MeshStandardMaterial({ 
+                    color: 0x333333,
+                    metalness: 0.8,
+                    roughness: 0.2
+                })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -20;
+            this.scene.add(ground);
+        }
+
+        createLights() {
+            const ambient = new THREE.AmbientLight(0x333333);
+            this.lightning = new THREE.PointLight(0x9999ff, 0, 100);
+            this.lightning.position.set(0, 20, 0);
+            this.scene.add(ambient, this.lightning);
+        }
+
+        createParticleSystems() {
+            // Rain particles
+            const rainGeo = new THREE.BufferGeometry();
+            const rainPositions = new Float32Array(10000 * 3);
+            const rainVelocities = new Float32Array(10000);
+            
+            for(let i = 0; i < 10000 * 3; i += 3) {
+                rainPositions[i] = (Math.random() - 0.5) * 100;
+                rainPositions[i+1] = Math.random() * 50;
+                rainPositions[i+2] = (Math.random() - 0.5) * 100;
+                rainVelocities[i/3] = 0.1 + Math.random() * 0.3;
+            }
+            
+            rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+            rainGeo.setAttribute('velocity', new THREE.BufferAttribute(rainVelocities, 1));
+            
+            const rainMaterial = new THREE.PointsMaterial({
+                color: 0x99ccff,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+
+            this.particles['rain'] = new THREE.Points(rainGeo, rainMaterial);
+
+            // Snow particles with different material and behavior
+            const snowGeo = new THREE.BufferGeometry();
+            const snowPositions = new Float32Array(5000 * 3);
+            const snowVelocities = new Float32Array(5000);
+            
+            for(let i = 0; i < 5000 * 3; i += 3) {
+                snowPositions[i] = (Math.random() - 0.5) * 100;
+                snowPositions[i+1] = Math.random() * 50;
+                snowPositions[i+2] = (Math.random() - 0.5) * 100;
+                snowVelocities[i/3] = 0.02 + Math.random() * 0.1;
+            }
+            
+            snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPositions, 3));
+            snowGeo.setAttribute('velocity', new THREE.BufferAttribute(snowVelocities, 1));
+            
+            const snowMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.2,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            this.particles['snow'] = new THREE.Points(snowGeo, snowMaterial);
+        }
+
+        bindControls() {
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const weather = (e.target as HTMLElement).dataset.weather;
+                    if (weather) {
+                        this.setWeather(weather);
+                    }
+                });
+            });
+
+            const intensitySlider = document.querySelector('#intensity') as HTMLInputElement;
+            intensitySlider.addEventListener('input', (e) => {
+                this.intensity = parseInt((e.target as HTMLInputElement).value) / 100;
+            });
+        }
+
+        setWeather(type: string) {
+            // Type-safe particle access
+            Object.values(this.particles).forEach(p => this.scene.remove(p));
+            if (type in this.particles) {  // Type-safe check
+                this.scene.add(this.particles[type]);
+                this.currentWeather = type;
+            }
+        }
+
+        updateParticles() {
+            const particles = this.particles[this.currentWeather];
+            const positions = particles.geometry.attributes.position;
+            const velocities = particles.geometry.attributes.velocity;
+
+            for(let i = 0; i < positions.count; i++) {
+                let y = positions.getY(i);
+                y -= velocities.getX(i) * this.intensity;
+                
+                if (y < -20) {
+                    y = 30;
+                    // Reset X and Z for variation
+                    positions.setX(i, (Math.random() - 0.5) * 100);
+                    positions.setZ(i, (Math.random() - 0.5) * 100);
+                }
+                
+                positions.setY(i, y);
+
+                if (this.currentWeather === 'snow') {
+                    // Add swaying motion to snow
+                    const x = positions.getX(i);
+                    positions.setX(i, x + Math.sin(Date.now() * 0.001 + i) * 0.01);
+                }
+            }
+
+            positions.needsUpdate = true;
+
+            // Handle storm effects
+            if (this.currentWeather === 'storm') {
+                if (Math.random() < 0.005) {
+                    this.lightning.intensity = 5;
+                    setTimeout(() => this.lightning.intensity = 0, 100);
+                }
+            } else {
+                this.lightning.intensity = 0;
+            }
+        }
+
+        createLightning() {
+            this.lightning = new THREE.PointLight(0xffffff, 0, 100);
+            this.lightning.position.set(0, 20, 0);
+            this.scene.add(this.lightning);
+        }
+
+        updateStorm() {
+            // Update rain
+            this.updateParticles();
+
+            // Lightning effect
+            this.thunderTimer++;
+            if (this.thunderTimer > 120 && Math.random() < 0.03) {  // Flash every ~4 seconds
+                this.lightning.intensity = 2;
+                setTimeout(() => {
+                    this.lightning.intensity = 0;
+                    this.thunderTimer = 0;
+                }, 100);
+            }
+        }
+
+        animate = () => {
+            requestAnimationFrame(this.animate);
+
+            if (this.currentWeather === 'storm') {
+                this.updateStorm();
+            } else if (this.currentWeather === 'rain') {
+                this.updateParticles();
+            } else if (this.currentWeather === 'snow') {
+                this.updateParticles();
+            }
+
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+
+    // Initialize with error handling
+    try {
+        const weatherSystem = new WeatherSystem();
+    } catch (error) {
+        console.error('Failed to initialize Weather System:', error);
+    }
+
+    // Fix resize handler
+    window.addEventListener('resize', () => {
+        const canvas = document.querySelector('#weather-scene');
+        if (!canvas) return;
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: canvas as HTMLCanvasElement 
+        });
+        
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #111111;
+        overflow: hidden;
+    }
+
+    .controls-panel {
+        position: fixed;
+        top: 50%;
+        right: 2rem;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 1rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .control-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .control-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .intensity-slider {
+        color: #fff;
+        font-family: monospace;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .intensity-slider input {
+        width: 100%;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 0.8rem 1.2rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: all 0.3s;
+        font-family: monospace;
+        display: inline-block;
+    }
+
+    .nav-links a:hover {
+        opacity: 1;
+        transform: translateY(-1px);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+</style>

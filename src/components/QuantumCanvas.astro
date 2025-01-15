@@ -1,0 +1,155 @@
+---
+---
+
+<div class="canvas">
+    <nav class="nav-links">
+        <a href="/">RETURN TO LAB</a>
+    </nav>
+    <canvas id="quantum-scene"></canvas>
+</div>
+
+<script>
+    import * as THREE from 'three';
+    import { GPUComputationRenderer } from 'three/addons/misc/GPUComputationRenderer.js';
+
+    const WIDTH = 128;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({
+        canvas: document.querySelector('#quantum-scene') as HTMLCanvasElement,
+        antialias: true
+    });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000);
+    camera.position.z = 50;
+
+    // Initialize particles
+    const particles = new Float32Array(WIDTH * WIDTH * 3);
+    const colors = new Float32Array(WIDTH * WIDTH * 3);
+    const geometry = new THREE.BufferGeometry();
+    
+    for (let i = 0; i < particles.length; i += 3) {
+        particles[i] = (Math.random() - 0.5) * 50;
+        particles[i + 1] = (Math.random() - 0.5) * 50;
+        particles[i + 2] = (Math.random() - 0.5) * 50;
+        
+        colors[i] = Math.random();
+        colors[i + 1] = Math.random();
+        colors[i + 2] = Math.random();
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(particles, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const material = new THREE.PointsMaterial({
+        size: 0.1,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        transparent: true
+    });
+
+    const points = new THREE.Points(geometry, material);
+    scene.add(points);
+
+    // Mouse interaction
+    const mouse = new THREE.Vector2();
+    const target = new THREE.Vector2();
+    let isPressed = false;
+
+    document.addEventListener('mousemove', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    document.addEventListener('mousedown', () => isPressed = true);
+    document.addEventListener('mouseup', () => isPressed = false);
+
+    // Animation
+    const positions = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const colorsAttribute = geometry.getAttribute('color') as THREE.BufferAttribute;
+    let time = 0;
+
+    function animate() {
+        requestAnimationFrame(animate);
+        time += 0.01;
+
+        for (let i = 0; i < positions.count; i++) {
+            const px = positions.getX(i);
+            const py = positions.getY(i);
+            const pz = positions.getZ(i);
+
+            // Quantum-like behavior
+            const angle = time + i * 0.0001;
+            const distance = Math.sqrt(px * px + py * py + pz * pz);
+            
+            positions.setXYZ(i, 
+                px + Math.sin(angle + distance * 0.1) * 0.1,
+                py + Math.cos(angle + distance * 0.1) * 0.1,
+                pz + Math.sin(angle * 0.5) * 0.1
+            );
+
+            // Color wave effect
+            const r = Math.sin(time + distance * 0.1) * 0.5 + 0.5;
+            const g = Math.cos(time + distance * 0.1) * 0.5 + 0.5;
+            const b = Math.sin(time * 0.5) * 0.5 + 0.5;
+
+            colorsAttribute.setXYZ(i, r, g, b);
+        }
+
+        positions.needsUpdate = true;
+        colorsAttribute.needsUpdate = true;
+
+        // Mouse interaction
+        if (isPressed) {
+            points.rotation.y += mouse.x * 0.01;
+            points.rotation.x += mouse.y * 0.01;
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+</script>
+
+<style>
+    .canvas {
+        width: 100%;
+        height: 100vh;
+        background: #000;
+        overflow: hidden;
+    }
+
+    canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    .nav-links {
+        position: fixed;
+        top: 2rem;
+        left: 2rem;
+        z-index: 100;
+    }
+
+    .nav-links a {
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.8rem;
+        letter-spacing: 0.2em;
+        opacity: 0.7;
+        transition: opacity 0.3s;
+    }
+
+    .nav-links a:hover {
+        opacity: 1;
+    }
+</style>
