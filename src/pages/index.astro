@@ -2,8 +2,8 @@
 import Layout from '../layouts/Layout.astro';
 
 const labItems = [
-    // { href: '/weather', name: 'WEATHER LAB' },
     { href: '/waves', name: 'FLUID' },
+    { href: '/astro', name: 'JUST AN ASTRONAUT' },
 
     { href: '/sound', name: 'SOUND WAVE' },
     { href: '/runner', name: 'GRID RUNNER' },
@@ -24,26 +24,33 @@ const labItems = [
 ---
 
 <Layout title="VIA LABS">
-    <div class="mobile-warning">
-        Best experienced on desktop
-    </div>
-    <div class="labs">
-        <div class="title-section">
-            <h1>VIA<br/>LABS</h1>
-            <p class="subtitle">Exploratory scenescapes</p>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <main id="main-content" role="main" aria-label="Main Content">
+        <div class="mobile-warning">
+            Best experienced on desktop
         </div>
-        <nav class="lab-links">
-            {labItems.map((item, index) => (
-                <a href={item.href} class="link reveal-item" data-preview={item.href}>
-                    <span class="number">{(index + 1).toString().padStart(2, '0')}</span>
-                    <span class="name">{item.name}</span>
-                </a>
-            ))}
-        </nav>
-        <div id="preview-popup">
-            <iframe></iframe>
+        <div class="labs">
+            <div class="title-section">
+                <h1>VIA<br/>LABS</h1>
+                <p class="subtitle">Exploratory scenescapes</p>
+            </div>
+            <nav class="lab-links" aria-label="List of lab projects">
+                <ul>
+                    {labItems.map((item, index) => (
+                        <li>
+                            <a href={item.href} class="link reveal-item" data-preview={item.href}>
+                                <span class="number">{(index + 1).toString().padStart(2, '0')}</span>
+                                <span class="name">{item.name}</span>
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
+            <div id="preview-popup">
+                <iframe></iframe>
+            </div>
         </div>
-    </div>
+    </main>
 </Layout>
 
 <script>
@@ -143,7 +150,9 @@ const labItems = [
         text-transform: uppercase;
     }
 
-    .lab-links {
+    .lab-links  ul{
+        list-style: none;
+
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
@@ -166,6 +175,7 @@ const labItems = [
             transparent
         );
     }
+    
 
     .link {
         display: flex;
@@ -231,6 +241,21 @@ const labItems = [
         font-size: 0.8rem;
         letter-spacing: 0.1em;
         z-index: 1000;
+    }
+
+    .skip-link {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #000;
+        color: #fff;
+        padding: 8px;
+        z-index: 100;
+        transition: top 0.3s;
+    }
+
+    .skip-link:focus {
+        top: 0;
     }
 
     @media (max-width: 768px) {
